@@ -17,6 +17,8 @@ Silence warnings in [xtask][xtask] builds without invalidating the dependency ca
 
 ## Purpose
 
+This is a micro crate with zero dependencies for use with xtask during development.
+
 The standard way to silence compiler warnings during development is to set
 `RUSTFLAGS=-Awarnings`. It works, but it has a painful side effect: `RUSTFLAGS` is part of the
 compiler fingerprint for **every** crate in the build graph. Toggling it forces Cargo to
@@ -66,7 +68,25 @@ wrapper, it exits immediately before any of your setup code runs.
 
 ### 3. Spawn Cargo with or without warnings
 
-#### Option A - `cargo_command`
+#### Option A - `setup`
+
+This function configures the current process to act as a workspace wrapper. Useful when you are
+building the `Command` yourself and only want to add the wrapper conditionally.
+
+```rust
+fn build(no_warnings: bool) {
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.args(["build", "--release"]);
+
+    if no_warnings {
+        xtask_no_warnings::setup();
+    }
+
+    cmd.status().expect("cargo failed");
+}
+```
+
+#### Option B - `cargo_command`
 
 This function returns a `Command` for Cargo with the wrapper environment variable already set.
 Append your subcommand and flags before running it.
@@ -82,24 +102,6 @@ fn build(no_warnings: bool) {
     cmd.args(["build", "--release"])
         .status()
         .expect("cargo failed");
-}
-```
-
-#### Option B - `setup`
-
-This function configures an existing `Command` in place. Useful when you are building the
-`Command` yourself and only want to add the wrapper conditionally.
-
-```rust
-fn build(no_warnings: bool) {
-    let mut cmd = std::process::Command::new("cargo");
-    cmd.args(["build", "--release"]);
-
-    if no_warnings {
-        xtask_no_warnings::setup(&mut cmd);
-    }
-
-    cmd.status().expect("cargo failed");
 }
 ```
 
@@ -127,19 +129,6 @@ xtask = "run --package xtask --"
 
 You should be able to invoke your xtask with `cargo xtask <task>`. For more information, check
 the [xtask][xtask] repository.
-
-### Trade-offs
-
-|   | `RUSTFLAGS=-Awarnings` | `xtask_no_warnings` |
-| - | ---------------------- | ------------------- |
-| Silence warnings | Yes | Yes |
-| Dependencies recompiled on toggle | Always | Never |
-| Workspace members recompiled on first toggle | Always | Once per mode |
-| Workspace members recompiled on subsequent toggle | Always | Never (cached) |
-| Extra setup required | None | `init` + one function call |
-
-The extra setup is a one-time cost. After that, every toggle is free for dependencies and free
-for workspace members after the first time each mode is entered.
 
 [xtask]: https://github.com/matklad/cargo-xtask
 [workspace_wrapper]: https://doc.rust-lang.org/cargo/reference/config.html#buildrustc-workspace-wrapper
