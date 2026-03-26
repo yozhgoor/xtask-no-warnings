@@ -1,4 +1,4 @@
-use std::process::Command;
+#![allow(clippy::needless_doctest_main)]
 
 //! Silence warnings in [xtask][xtask] builds without invalidating the dependency cache.
 //!
@@ -8,7 +8,7 @@ use std::process::Command;
 //! `RUSTFLAGS=-Awarnings`. It works, but it has a painful side effect: `RUSTFLAGS` is part of the
 //! compiler fingerprint for **every** crate in the build graph. Toggling it forces Cargo to
 //! recompile the entire project from scratch, including all dependencies. On machines with limited
-//! resources (e.g. low-specs laptops, handled devices, ...) this means minutes of wasted build
+//! resources (e.g. low-specs laptops, handheld devices, ...) this means minutes of wasted build
 //! time every single time you flip the flag.
 //!
 //! This crate solves the problem by using [`RUSTC_WORKSPACE_WRAPPER`][workspace_wrapper] instead.
@@ -32,12 +32,10 @@ use std::process::Command;
 //! ## 1. Add the dependency to your xtask
 //!
 //! `xtask/Cargo.toml`
-//! ```
+//! ```toml
 //! [dependencies]
 //! xtask-no-warnings = "0.1"
 //! ```
-//!
-//! > [!NOTE] Ensure this is the latest available version.
 //!
 //! ## 2. Call init at the top of main
 //!
@@ -94,7 +92,7 @@ use std::process::Command;
 //!
 //! ## Basic xtask setup
 //!
-//! A typical project using this an xtask workspace member looks like this:
+//! A typical project using a xtask workspace member looks like this:
 //! ```toml
 //! my-project/
 //!   Cargo.toml
@@ -133,6 +131,8 @@ use std::process::Command;
 //! [xtask]: https://github.com/matklad/cargo-xtask
 //! [workspace_wrapper]: https://doc.rust-lang.org/cargo/reference/config.html#buildrustc-workspace-wrapper
 
+use std::process::Command;
+
 /// Sentinel environment variable used to distinguish wrapper invocations from normal xtask
 /// invocations.
 const ENV_KEY: &str = "XTASK_RUSTC_WRAPPER";
@@ -159,7 +159,6 @@ const ENV_KEY: &str = "XTASK_RUSTC_WRAPPER";
 ///     // Your xtask logic starts here.
 /// }
 /// ```
-#[allow(clippy::needless_doctest_main)]
 pub fn init() {
     if std::env::var_os(ENV_KEY).is_none() {
         return;

@@ -4,10 +4,9 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85.1"
 description = "Silence warnings in builds without invalidating the dependency cache"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/yozhgoor/xtask-no-warnings"
+documentation = "https://docs.rs/xtask-no-warnings"
 readme = "README.md"
+repository = "https://github.com/yozhgoor/xtask-no-warnings"
+license = "MIT OR Apache-2.0"
 keywords = ["xtask", "cargo", "rustc", "warnings", "build"]
 categories = ["development-tools::build-utils"]
-
-[dependencies]

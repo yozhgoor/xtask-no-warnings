@@ -8,7 +8,7 @@ The standard way to silence compiler warnings during development is to set
 `RUSTFLAGS=-Awarnings`. It works, but it has a painful side effect: `RUSTFLAGS` is part of the
 compiler fingerprint for **every** crate in the build graph. Toggling it forces Cargo to
 recompile the entire project from scratch, including all dependencies. On machines with limited
-resources (e.g. low-specs laptops, handled devices, ...) this means minutes of wasted build
+resources (e.g. low-specs laptops, handheld devices, ...) this means minutes of wasted build
 time every single time you flip the flag.
 
 This crate solves the problem by using [`RUSTC_WORKSPACE_WRAPPER`][workspace_wrapper] instead.
@@ -32,12 +32,10 @@ toggle hits the cache immediately.
 ### 1. Add the dependency to your xtask
 
 `xtask/Cargo.toml`
-```rust
+```toml
 [dependencies]
 xtask-no-warnings = "0.1"
 ```
-
-> [!NOTE] Ensure this is the latest available version.
 
 ### 2. Call init at the top of main
 
@@ -94,7 +92,7 @@ fn build(no_warnings: bool) {
 
 ### Basic xtask setup
 
-A typical project using this an xtask workspace member looks like this:
+A typical project using a xtask workspace member looks like this:
 ```toml
 my-project/
   Cargo.toml
