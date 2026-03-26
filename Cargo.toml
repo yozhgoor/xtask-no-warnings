@@ -3,5 +3,6 @@ name = "xtask-no-warnings"
 version = "0.1.0"
 edition = "2024"
 description = "Suppress warnings in builds without invalidating the dependency cache"
+readme = "README.md"
 
 [dependencies]
