@@ -4,6 +4,8 @@
 //!
 //! # Purpose
 //!
+//! This is a micro crate with zero dependencies for use with xtask during development.
+//!
 //! The standard way to silence compiler warnings during development is to set
 //! `RUSTFLAGS=-Awarnings`. It works, but it has a painful side effect: `RUSTFLAGS` is part of the
 //! compiler fingerprint for **every** crate in the build graph. Toggling it forces Cargo to
@@ -74,8 +76,9 @@
 //!
 //! ### Option B - `setup`
 //!
-//! This function configures an existing `Command` in place. Useful when you are building the
-//! `Command` yourself and only want to add the wrapper conditionally.
+//! This function configures the current process to act as a workspace wrapper. Useful when you are
+//! building the `Command` yourself and only want to add the wrapper conditionally.
+//!
 //!
 //! ```rust,no_run
 //! fn build(no_warnings: bool) {
@@ -83,7 +86,7 @@
 //!     cmd.args(["build", "--release"]);
 //!
 //!     if no_warnings {
-//!         xtask_no_warnings::setup(&mut cmd);
+//!         unsafe { xtask_no_warnings::setup(); }
 //!     }
 //!
 //!     cmd.status().expect("cargo failed");
@@ -114,19 +117,6 @@
 //!
 //! You should be able to invoke your xtask with `cargo xtask <task>`. For more information, check
 //! the [xtask][xtask] repository.
-//!
-//! ## Trade-offs
-//!
-//! |   | `RUSTFLAGS=-Awarnings` | `xtask_no_warnings` |
-//! | - | ---------------------- | ------------------- |
-//! | Silence warnings | Yes | Yes |
-//! | Dependencies recompiled on toggle | Always | Never |
-//! | Workspace members recompiled on first toggle | Always | Once per mode |
-//! | Workspace members recompiled on subsequent toggle | Always | Never (cached) |
-//! | Extra setup required | None | `init` + one function call |
-//!
-//! The extra setup is a one-time cost. After that, every toggle is free for dependencies and free
-//! for workspace members after the first time each mode is entered.
 //!
 //! [xtask]: https://github.com/matklad/cargo-xtask
 //! [workspace_wrapper]: https://doc.rust-lang.org/cargo/reference/config.html#buildrustc-workspace-wrapper
@@ -175,9 +165,9 @@ pub fn init() {
     std::process::exit(status.code().unwrap_or(1));
 }
 
-/// Configure an existing Cargo `Command` to suppress warnings in workspace members.
+/// Configures the current process to act as a workspace wrapper.
 ///
-/// This sets two environment variables on the command:
+/// This sets two environment variables on the current process:
 ///
 /// - `RUSTC_WORKSPACE_WRAPPER` - points to the current xtask executable so that Cargo routes
 ///   workspace member compilation through it.
@@ -185,6 +175,12 @@ pub fn init() {
 ///
 /// Dependencies are **not** wrapped and their cached artifacts remain valid regardless of whether
 /// you call this function.
+///
+/// # Safety
+///
+/// This function uses [`std::env::set_var`] which is unsafe if called concurrently from multiple
+/// threads. Callers must ensure this function is not invoked from multiple threads simultaneously.
+/// See https://doc.rust-lang.org/std/env/fn.set_var.html
 ///
 /// # Panics
 ///
@@ -198,24 +194,26 @@ pub fn init() {
 ///     cmd.args(["build", "--release"]);
 ///
 ///     if no_warnings {
-///         xtask_no_warnings::setup(&mut cmd);
+///         unsafe { xtask_no_warnings::setup(); }
 ///     }
 ///
 ///     cmd.status().expect("cargo failed");
 /// }
 /// ```
-pub fn setup(cmd: &mut Command) {
+pub unsafe fn setup() {
     let wrapper =
         std::env::current_exe().expect("cannot determine the path to the current executable");
-    cmd.env("RUSTC_WORKSPACE_WRAPPER", wrapper)
-        .env(ENV_KEY, "1");
+
+    unsafe {
+        std::env::set_var("RUSTC_WORKSPACE_WRAPPER", wrapper);
+        std::env::set_var(ENV_KEY, "1");
+    }
 }
 
 /// Return a Cargo `Command` pre-configured to suppress warnings in workspace members.
 ///
-/// This is a convenience wrapper around `setup`. The returned command already has
-/// `RUSTC_WORKSPACE_WRAPPER` and `XTASK_RUSTC_WRAPPER` set, you only need to append subcommand and
-/// flags.
+/// The returned command already has `RUSTC_WORKSPACE_WRAPPER` and `XTASK_RUSTC_WRAPPER` set, you
+/// only need to append subcommand and flags.
 ///
 /// The Cargo executable is taken from the `CARGO` environment variable when available (which Cargo
 /// sets automatically), falling back to `cargo` if not set.
@@ -235,8 +233,11 @@ pub fn setup(cmd: &mut Command) {
 /// }
 /// ```
 pub fn cargo_command() -> Command {
+    let wrapper =
+        std::env::current_exe().expect("cannot determine the path to the current executable");
     let cargo = std::env::var_os("CARGO").unwrap_or("cargo".into());
     let mut cmd = Command::new(cargo);
-    setup(&mut cmd);
+    cmd.env("RUSTC_WORKSPACE_WRAPPER", wrapper);
+    cmd.env(ENV_KEY, "1");
     cmd
 }
