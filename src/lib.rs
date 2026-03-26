@@ -66,7 +66,7 @@
 //!     cmd.args(["build", "--release"]);
 //!
 //!     if no_warnings {
-//!         xtask_no_warnings::setup();
+//!         unsafe { xtask_no_warnings::setup(); }
 //!     }
 //!
 //!     cmd.status().expect("cargo failed");
@@ -175,6 +175,12 @@ pub fn init() {
 /// Dependencies are **not** wrapped and their cached artifacts remain valid regardless of whether
 /// you call this function.
 ///
+/// # Safety
+///
+/// This function uses [`std::env::set_var`] which is unsafe if called concurrently from multiple
+/// threads. Callers must ensure this function is not invoked from multiple threads simultaneously.
+/// See https://doc.rust-lang.org/std/env/fn.set_var.html
+///
 /// # Panics
 ///
 /// Panics if the path to the current executable cannot be determined.
@@ -187,18 +193,16 @@ pub fn init() {
 ///     cmd.args(["build", "--release"]);
 ///
 ///     if no_warnings {
-///         xtask_no_warnings::setup();
+///         unsafe { xtask_no_warnings::setup(); }
 ///     }
 ///
 ///     cmd.status().expect("cargo failed");
 /// }
 /// ```
-pub fn setup() {
+pub unsafe fn setup() {
     let wrapper =
         std::env::current_exe().expect("cannot determine the path to the current executable");
 
-    // SAFETY: `set_var` is not safe if called concurrently from multiple threads on Unix.
-    // See https://doc.rust-lang.org/std/env/fn.set_var.html
     unsafe {
         std::env::set_var("RUSTC_WORKSPACE_WRAPPER", wrapper);
         std::env::set_var(ENV_KEY, "1");
@@ -207,9 +211,8 @@ pub fn setup() {
 
 /// Return a Cargo `Command` pre-configured to suppress warnings in workspace members.
 ///
-/// This is a convenience wrapper around `setup`. The returned command already has
-/// `RUSTC_WORKSPACE_WRAPPER` and `XTASK_RUSTC_WRAPPER` set, you only need to append subcommand and
-/// flags.
+/// The returned command already has `RUSTC_WORKSPACE_WRAPPER` and `XTASK_RUSTC_WRAPPER` set, you
+/// only need to append subcommand and flags.
 ///
 /// The Cargo executable is taken from the `CARGO` environment variable when available (which Cargo
 /// sets automatically), falling back to `cargo` if not set.
@@ -229,7 +232,11 @@ pub fn setup() {
 /// }
 /// ```
 pub fn cargo_command() -> Command {
-    setup();
+    let wrapper =
+        std::env::current_exe().expect("cannot determine the path to the current executable");
     let cargo = std::env::var_os("CARGO").unwrap_or("cargo".into());
-    Command::new(cargo)
+    let mut cmd = Command::new(cargo);
+    cmd.env("RUSTC_WORKSPACE_WRAPPER", wrapper);
+    cmd.env(ENV_KEY, "1");
+    cmd
 }

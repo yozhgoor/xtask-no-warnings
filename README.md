@@ -79,7 +79,7 @@ fn build(no_warnings: bool) {
     cmd.args(["build", "--release"]);
 
     if no_warnings {
-        xtask_no_warnings::setup();
+        unsafe { xtask_no_warnings::setup(); }
     }
 
     cmd.status().expect("cargo failed");
