@@ -55,25 +55,7 @@
 //!
 //! ## 3. Spawn Cargo with or without warnings
 //!
-//! ### Option A - `setup`
-//!
-//! This function configures the current process to act as a workspace wrapper. Useful when you are
-//! building the `Command` yourself and only want to add the wrapper conditionally.
-//!
-//! ```rust,no_run
-//! fn build(no_warnings: bool) {
-//!     let mut cmd = std::process::Command::new("cargo");
-//!     cmd.args(["build", "--release"]);
-//!
-//!     if no_warnings {
-//!         unsafe { xtask_no_warnings::setup(); }
-//!     }
-//!
-//!     cmd.status().expect("cargo failed");
-//! }
-//! ```
-//!
-//! ### Option B - `cargo_command`
+//! ### Option A - `cargo_command`
 //!
 //! This function returns a `Command` for Cargo with the wrapper environment variable already set.
 //! Append your subcommand and flags before running it.
@@ -89,6 +71,25 @@
 //!     cmd.args(["build", "--release"])
 //!         .status()
 //!         .expect("cargo failed");
+//! }
+//! ```
+//!
+//! ### Option B - `setup`
+//!
+//! This function configures the current process to act as a workspace wrapper. Useful when you are
+//! building the `Command` yourself and only want to add the wrapper conditionally.
+//!
+//!
+//! ```rust,no_run
+//! fn build(no_warnings: bool) {
+//!     let mut cmd = std::process::Command::new("cargo");
+//!     cmd.args(["build", "--release"]);
+//!
+//!     if no_warnings {
+//!         unsafe { xtask_no_warnings::setup(); }
+//!     }
+//!
+//!     cmd.status().expect("cargo failed");
 //! }
 //! ```
 //!
