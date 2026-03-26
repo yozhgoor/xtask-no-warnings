@@ -2,7 +2,11 @@
 name = "xtask-no-warnings"
 version = "0.1.0"
 edition = "2024"
-description = "Suppress warnings in builds without invalidating the dependency cache"
+rust-version = "1.85.1"
+description = "Silence warnings in builds without invalidating the dependency cache"
+repository = "https://github.com/yozhgoor/xtask-no-warnings"
 readme = "README.md"
+keywords = ["xtask", "cargo", "rustc", "warnings", "build"]
+categories = ["development-tools::build-utils"]
 
 [dependencies]

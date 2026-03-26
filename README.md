@@ -1,48 +1,48 @@
-# Xtask-no-warnings
+# xtask-no-warnings
 
-Suppress warnings in [xtask][xtask] builds without invalidating the dependency cache.
+Silence warnings in [xtask][xtask] builds without invalidating the dependency cache.
 
 ## Purpose
 
-The standard way to suppress compiler warnings during development is to set `RUSTFLAGS=-Awarnings`.
-It works but it has a painful side effect.
+The standard way to silence compiler warnings during development is to set
+`RUSTFLAGS=-Awarnings`. It works, but it has a painful side effect: `RUSTFLAGS` is part of the
+compiler fingerprint for **every** crate in the build graph. Toggling it forces Cargo to
+recompile the entire project from scratch, including all dependencies. On machines with limited
+resources (e.g. low-specs laptops, handled devices, ...) this means minutes of wasted build
+time every single time you flip the flag.
 
-`RUSTFLAGS` is part of the compiler fingerprint for **every** crate in the build graph. Toggling it
-at any point forces Cargo to recompile the entire project from scratch. On machines with limited
-resources (e.g. low-specs or handled/laptop computers) this can mean minutes of wasted build time
-every single time you flip the flag.
+This crate solves the problem by using [`RUSTC_WORKSPACE_WRAPPER`][workspace_wrapper] instead.
+`RUSTC_WORKSPACE_WRAPPER` routes `rustc` invocations through a wrapper binary but **only for
+workspace members**. Dependencies are compiled by `rustc` directly and their cached artifacts
+remain valid regardless of whether the wrapper is active.
 
-This crate solves the problem by using [`RUSTC_WORKSPACE_WRAPPER`][workspace_wrapper] instead of
-`RUSTFLAGS`.
+The wrapper here is the xtask binary itself. At startup, [`init`] checks for a sentinel
+environment variable. When Cargo invokes the xtask as a rustc wrapper, `init` forwards all
+arguments to the real `rustc` with `-Awarnings` prepended and then exits. When the developer
+invokes the xtask normally, `init` is a no-op and the rest of the `main` function runs as
+usual.
 
-`RUSTC_WORKSPACE_WRAPPER` routes `rustc` invocations through a wrapper binary but **only for workspace
-members**. Dependencies are compiled by `rustc` directly so their fingerprints never change and
-their cached artifacts remain valid regardless of whether the wrapper is active.
-
-The wrapper here is the xtask binary itself. At startup, `init` checks for a sentinel
-environment variable. When Cargo invokes the xtask as a rustc wrapper, `init` forwards all arguments
-to the real `rustc` with `-Awarnings` prepended and then exits. When the developer invokes the xtask
-normally, `init` is a no-op and the rest of `main` runs a usual.
-
-Because `RUSTC_WORKSPACE_WRAPPER` produces artifacts under a **separate fingerprint** from a plain
-`rustc` run, the two modes (warnings on or off) maintain independent caches for workspace members.
-The very first toggle in each direction recompiles those crates but every subsequent toggle hits the
-cache immediately.
+Because `RUSTC_WORKSPACE_WRAPPER` produces artifacts under a **separate fingerprint** from a
+plain `rustc` run, the two modes (warning on or off) maintain independent caches for workspace
+members. The very first toggle in each direction recompiles those crates, every subsequent
+toggle hits the cache immediately.
 
 ## Usage
 
 ### 1. Add the dependency to your xtask
 
-```toml
-# xtask/Cargo.toml
+`xtask/Cargo.toml`
+```rust
 [dependencies]
 xtask-no-warnings = "0.1"
 ```
 
-### 2. Call `init` at the top of main
+> [!NOTE] Ensure this is the latest available version.
 
+### 2. Call init at the top of main
+
+`xtask/src/main.rs`
 ```rust
-// xtask/src/main.rs
 fn main() {
     xtask_no_warnings::init();
 
@@ -50,15 +50,15 @@ fn main() {
 }
 ```
 
-`init` must be the very first statement so that when Cargo invokes the xtask as a rustc wrapper it
-exits immediately, before any of your setup code runs.
+`init` must be the very first statement so that when Cargo invokes the xtask as a rustc
+wrapper, it exits immediately before any of your setup code runs.
 
-### 3. Use the wrapper when spawning Cargo
+### 3. Spawn Cargo with or without warnings
 
-#### Option A - `cargo_command` function
+#### Option A - `cargo_command`
 
-Returns a `Command` for Cargo with the wrapper environment variable already set. Append your
-subcommand and flags before running it.
+This function returns a `Command` for Cargo with the wrapper environment variable already set.
+Append your subcommand and flags before running it.
 
 ```rust
 fn build(no_warnings: bool) {
@@ -74,10 +74,10 @@ fn build(no_warnings: bool) {
 }
 ```
 
-#### Option B - `setup` function
+#### Option B - `setup`
 
-Configures an existing `Command` in place. Useful when you are building the `Command` yourself and
-only want to add the wrapper conditionally.
+This function configures an existing `Command` in place. Useful when you are building the
+`Command` yourself and only want to add the wrapper conditionally.
 
 ```rust
 fn build(no_warnings: bool) {
@@ -91,6 +91,44 @@ fn build(no_warnings: bool) {
     cmd.status().expect("cargo failed");
 }
 ```
+
+### Basic xtask setup
+
+A typical project using this an xtask workspace member looks like this:
+```toml
+my-project/
+  Cargo.toml
+  .cargo/
+    config.toml
+  src/
+    lib.rs
+  xtask/
+    Cargo.toml
+    src/main.rs
+```
+
+To create it the `xtask`, you can use `cargo new xtask` in the root of your project, you can
+then create the `.cargo/config.toml` that should contains the following:
+```toml
+[alias]
+xtask = "run --package xtask --"
+```
+
+You should be able to invoke your xtask with `cargo xtask <task>`. For more information, check
+the [xtask][xtask] repository.
+
+### Trade-offs
+
+|   | `RUSTFLAGS=-Awarnings` | `xtask_no_warnings` |
+| - | ---------------------- | ------------------- |
+| Silence warnings | Yes | Yes |
+| Dependencies recompiled on toggle | Always | Never |
+| Workspace members recompiled on first toggle | Always | Once per mode |
+| Workspace members recompiled on subsequent toggle | Always | Never (cached) |
+| Extra setup required | None | `init` + one function call |
+
+The extra setup is a one-time cost. After that, every toggle is free for dependencies and free
+for workspace members after the first time each mode is entered.
 
 [xtask]: https://github.com/matklad/cargo-xtask
 [workspace_wrapper]: https://doc.rust-lang.org/cargo/reference/config.html#buildrustc-workspace-wrapper
